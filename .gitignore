@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+
+# Secrets / API keys
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# VS Code
+.vscode/
+
+# Logs
+logs/
+*.log
+
+# Local JARVIS databases / memory
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Personal configuration / secrets
+config/local*
+config/secrets*
+
+# Speech / AI model files
+models/
+*.onnx
+
+# Temporary files
+*.tmp
+*.temp
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Local backups
+backups/
+
+# Local runtime data
+data/*.db
+data/*.log
+data/screenshots/
+
+# Generated preview/debug images
+data/*.png
+
+# Keep empty data folder if needed
+!data/.gitkeep
+
+# Local settings
+config/settings.json
