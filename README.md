@@ -1,6 +1,6 @@
 # JARVIS V2 — Personal AI Command Center
 
-A modular Windows assistant with an original animated cyan HUD, real telemetry, typed commands, offline voice recognition, local Windows automation, spoken replies, notes and reminders. V2 retains V1's command services, data and confirmation boundary. No paid API, account, or cloud transcription is required.
+A modular Windows assistant with an original animated amber holographic HUD, real telemetry, typed commands, offline voice recognition, local Windows automation, spoken replies, notes and reminders. V2 retains V1's command services, data and confirmation boundary. No paid API, account, or cloud transcription is required.
 
 ## Launch the existing installation
 

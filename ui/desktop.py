@@ -14,7 +14,7 @@ from core.diagnostics import failure
 from services.voice import Speaker, Microphone
 from services.dashboard import DashboardFeed
 from services.desktop_integration import Hotkey, Tray
-from ui.theme import BG, PANEL, CYAN, TEXT, MUTED, AMBER, label, button, configure_ttk, set_text
+from ui.theme import BG, PANEL, CYAN, GLOW, TEXT, MUTED, AMBER, label, button, configure_ttk, set_text
 from ui.widgets.telemetry import rate
 from ui.widgets.hologram import mix
 from ui.state import AssistantState
@@ -40,6 +40,7 @@ class Desktop:
         self.status = tk.StringVar(value='Idle')
         self.mic_label = tk.StringVar(value='MICROPHONE: STANDBY')
         self.recognized = tk.StringVar(value='At your service.')
+        self.voice_prompt = tk.StringVar(value='STANDBY / TYPE A COMMAND')
         self.mic_active = self.mic_requested = self.closed = self.fullscreen = False
         self.current_command = ''
         self.interactions = deque(maxlen=self.config['privacy']['transcript_limit'])
@@ -89,9 +90,12 @@ class Desktop:
     def refresh_history(self): self.background(self.assistant.storage.recent, self.show_history)
 
     def show_history(self, rows):
+        changed = rows != self.latest_history
         self.latest_history = rows
         names = {'screenshot': 'Screenshot saved', 'reminder': 'Reminder created', 'note': 'Note saved', 'open': 'Launch requested'}
         set_text(self.history, '\n'.join(f'{stamp[11:16]}  {"✓" if ok else "!"}  {names.get(command, command.capitalize())}' for stamp, command, ok in rows[:6]))
+        if changed:
+            self.history_reveal = 0.
 
     def submit(self, text=None):
         if self.processing.is_set() or self.speaker.busy.is_set():
@@ -196,7 +200,12 @@ class Desktop:
             if self.closed: return
         state = self.state_model.resolve(self.processing.is_set(), self.speaker.busy.is_set(), self.mic_active)
         self.status.set(state)
-        self.state_label.configure(text=state.upper(), fg=AMBER if state == 'Error' else CYAN)
+        self.state_label.configure(text='STANDBY' if state == 'Idle' and not self.mic_active else state.upper(), fg=AMBER if state in ('Error', 'Offline') else CYAN)
+        prompts = {'Listening': "I'M LISTENING...", 'Processing': 'ANALYZING REQUEST...',
+                   'Speaking': 'JARVIS IS SPEAKING...', 'Error': 'SIGNAL INTERRUPTED',
+                   'Offline': 'LOCAL CORE OFFLINE'}
+        self.voice_prompt.set(prompts.get(state, 'SPEAK ANYTIME' if self.mic_active else 'STANDBY / TYPE A COMMAND'))
+        self.voice_caption.configure(fg=AMBER if state in ('Error', 'Offline') else GLOW if state in ('Listening', 'Speaking') else CYAN)
         self.root.after(40, self.poll)
 
     def animate(self):
@@ -205,20 +214,38 @@ class Desktop:
         dt, self.last_tick = min(.1, now-self.last_tick), now
         hidden = self.root.state() in ('iconic', 'withdrawn')
         if not hidden:
+            self.adapt_layout()
             self.core.tick(dt, self.status.get(), self.state_model.level, self.mic_active)
             state = self.status.get()
             edge = mix(AMBER if state == 'Error' else CYAN,
-                       .18 + .14 * (1 + math.sin(self.core.elapsed * 1.5)) / 2)
+                       .18 + .14 * (1 + math.sin(self.core.elapsed * 1.5)) / 2 + .22*self.core.reaction)
             self.core_panel.configure(highlightbackground=edge)
             # Subtle breathing glow on side panels
             subtle = mix(CYAN, .08 + .05 * (1 + math.sin(self.core.elapsed * .7)) / 2)
             for attr in ('left_panel', 'right_panel'):
                 p = getattr(self, attr, None)
                 if p: p.configure(highlightbackground=subtle)
-            self.waveform.tick(state, self.state_model.level, dt*self.core.intensity)
+            self.waveform.tick(state, self.state_model.level, dt*self.core.intensity, self.core.elapsed)
+            self.transcript_panel.configure(highlightbackground=edge)
+            self.terminal.configure(highlightbackground=mix(CYAN, .55 if self.root.focus_get() is self.entry else .16+.3*self.core.reaction))
+            self.mic_indicator.configure(fg=mix(CYAN, .6+.4*self.core.reaction) if self.mic_active else MUTED)
+            # Activity fades only on data changes, never on every feed refresh.
+            reveal = min(1., getattr(self, 'history_reveal', 1.) + dt*2.5)
+            if reveal != getattr(self, 'history_reveal', 1.):
+                self.history.configure(fg=mix(TEXT, .25+.75*reveal))
+                self.history_reveal = reveal
+            for panel in (self.core_panel, self.left_panel, self.right_panel):
+                sweep = getattr(panel, 'sweep', None)
+                if sweep:
+                    width = sweep.winfo_width()
+                    x = ((self.core.elapsed*.12) % 1)*(width+70)-70
+                    sweep.coords(panel.sweep_item, x, 1, x+70, 1)
+                    sweep.itemconfigure(panel.sweep_item, fill=edge)
             for gauge in self.gauges.values(): gauge.tick()
-        fps = min(15, self.config['dashboard']['fps']) if self.status.get() == 'Idle' else self.config['dashboard']['fps']
-        self.root.after(500 if hidden else int(1000/fps), self.animate)
+        fps = min(20, self.config['dashboard']['fps']) if self.status.get() == 'Idle' else self.config['dashboard']['fps']
+        # Allow Tk's deferred painting and queued input a full interval on busy frames.
+        delay = round(1000/fps)
+        self.root.after(500 if hidden else delay, self.animate)
 
     def show_telemetry(self, data):
         self.telemetry = data

@@ -67,5 +67,5 @@ class PerformanceGraph(tk.Canvas):
                     continue
                 segment.extend((w*i/59, h-5 - min(1, value/maximum)*(h-16)))
             if len(segment) >= 4: self.create_line(*segment, fill=color, width=1.5)
-        caption = f'{rate(maximum)} peak • ↓ cyan / ↑ blue' if self.mode == 'Network' else '0—100%  /  last 60 samples'
+        caption = f'{rate(maximum)} peak • ↓ gold / ↑ ember' if self.mode == 'Network' else '0—100%  /  last 60 samples'
         self.create_text(3, 2, text=caption, fill=MUTED, anchor='nw', font=('Consolas', 7))
